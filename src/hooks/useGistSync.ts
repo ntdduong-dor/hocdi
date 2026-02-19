@@ -60,9 +60,8 @@ export function useGistSync() {
         _lastModified: remoteData._lastModified,
       })
 
-      setSyncStatus('synced')
-      setLastSyncedAt(Date.now())
-      setHasRemoteUpdate(false)
+      // Reload trang để hiển thị data mới
+      window.location.reload()
     } catch (err) {
       setSyncStatus('error')
       setSyncError(err instanceof Error ? err.message : 'Lỗi đồng bộ')
@@ -145,10 +144,8 @@ export function useGistSync() {
             _lastModified: remoteData._lastModified,
           })
 
-          setSyncStatus('synced')
-          setLastSyncedAt(Date.now())
-          setHasRemoteUpdate(false)
-          isPulling.current = false
+          // Reload trang để hiển thị data mới
+          window.location.reload()
         } else {
           // Admin: chỉ hiện thông báo, không tự pull (tránh ghi đè đang sửa)
           setHasRemoteUpdate(true)
