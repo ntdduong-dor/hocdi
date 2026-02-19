@@ -109,7 +109,7 @@ export default function KanjiStudyPage() {
     const percent = total > 0 ? Math.round((remCount / total) * 100) : 0
 
     return (
-      <div className="max-w-md mx-auto text-center py-12">
+      <div className="max-w-2xl mx-auto text-center py-8 sm:py-12 px-2 sm:px-0">
         <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
           <Trophy size={32} className="text-yellow-600" />
         </div>
@@ -153,15 +153,15 @@ export default function KanjiStudyPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-2xl mx-auto px-2 sm:px-0">
       <div className="flex items-center justify-between mb-4">
         <Link
           to={`/kanji/${lesson.id}`}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
         >
-          <ChevronLeft size={16} /> {lesson.name}
+          <ChevronLeft size={16} /> <span className="truncate max-w-[120px] sm:max-w-none">{lesson.name}</span>
         </Link>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-gray-400 hidden sm:inline">
           Space: lật | ←: chưa nhớ | →: đã nhớ
         </span>
       </div>

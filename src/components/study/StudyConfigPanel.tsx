@@ -20,7 +20,7 @@ export default function StudyConfigPanel({ config, onChange, onStart }: StudyCon
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-lg mx-auto">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 max-w-2xl mx-auto">
       <h2 className="text-lg font-semibold text-gray-900 mb-4 text-center">Cài đặt học</h2>
 
       <div className="space-y-4">

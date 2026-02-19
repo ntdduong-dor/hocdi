@@ -29,27 +29,27 @@ export default function StudyControls({
     <div className="space-y-4">
       {/* Main controls */}
       {!isComplete && (
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center gap-4 sm:gap-6">
           <button
             onClick={onForget}
-            className="w-14 h-14 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center transition-colors"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center transition-colors active:scale-95"
             title="Chưa nhớ"
           >
-            <X size={24} />
+            <X size={24} className="sm:w-7 sm:h-7" />
           </button>
           <button
             onClick={onFlip}
-            className="w-12 h-12 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-colors"
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-colors active:scale-95"
             title="Lật thẻ"
           >
-            <RotateCcw size={20} />
+            <RotateCcw size={20} className="sm:w-6 sm:h-6" />
           </button>
           <button
             onClick={onRemember}
-            className="w-14 h-14 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition-colors"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition-colors active:scale-95"
             title="Đã nhớ"
           >
-            <Check size={24} />
+            <Check size={24} className="sm:w-7 sm:h-7" />
           </button>
         </div>
       )}

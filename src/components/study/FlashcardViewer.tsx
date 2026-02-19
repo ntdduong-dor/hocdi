@@ -24,21 +24,22 @@ function renderFields(card: Flashcard, fields: CardField[]) {
   const ordered = FIELD_ORDER.filter((f) => fields.includes(f))
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-3 sm:gap-4 w-full px-2">
       {ordered.map((field) => {
         const value = card[field]
         if (!value) return null
         const isKanji = field === 'kanji'
         return (
-          <div key={field} className="text-center">
+          <div key={field} className="text-center w-full">
             {isKanji ? (
-              <div className="text-5xl sm:text-6xl font-normal mb-1">{value}</div>
+              <div className="text-6xl sm:text-7xl md:text-8xl font-normal mb-2">{value}</div>
+            ) : field === 'sinoVietnamese' ? (
+              <div className="text-xl sm:text-2xl md:text-3xl text-orange-600 font-medium">{value}</div>
+            ) : field === 'meaning' ? (
+              <div className="text-lg sm:text-xl md:text-2xl text-gray-700 leading-relaxed break-words">{value}</div>
             ) : (
-              <div className={`text-lg sm:text-xl ${field === 'sinoVietnamese' ? 'text-orange-600 font-medium' : ''}`}>
-                {value}
-              </div>
+              <div className="text-xl sm:text-2xl md:text-3xl">{value}</div>
             )}
-            {/* no label */}
           </div>
         )
       })}
@@ -223,15 +224,15 @@ export default function FlashcardViewer({
               className="relative w-full preserve-3d"
               animate={{ rotateY: isFlipped ? 180 : 0 }}
               transition={{ duration: 0.5, ease: 'easeInOut' }}
-              style={{ minHeight: '280px' }}
+              style={{ minHeight: 'min(60vh, 420px)' }}
             >
               {/* Front */}
-              <div className="absolute inset-0 backface-hidden bg-white rounded-2xl shadow-lg border border-gray-200 flex items-center justify-center p-8">
+              <div className="absolute inset-0 backface-hidden bg-white rounded-2xl shadow-lg border border-gray-200 flex items-center justify-center p-6 sm:p-8 md:p-10">
                 {renderFields(card, frontFields)}
               </div>
 
               {/* Back */}
-              <div className="absolute inset-0 backface-hidden rotate-y-180 bg-blue-50 rounded-2xl shadow-lg border border-blue-200 flex items-center justify-center p-8">
+              <div className="absolute inset-0 backface-hidden rotate-y-180 bg-blue-50 rounded-2xl shadow-lg border border-blue-200 flex items-center justify-center p-6 sm:p-8 md:p-10">
                 {renderFields(card, backFields)}
               </div>
             </motion.div>
@@ -240,7 +241,7 @@ export default function FlashcardViewer({
       </AnimatePresence>
 
       {/* Toolbar: gear + TTS - sits OUTSIDE the 3D flip so always clickable */}
-      <div className="absolute top-4 right-4 z-30 flex items-center gap-1">
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-30 flex items-center gap-1">
         {onConfigChange && (
           <button
             ref={gearRef}
@@ -280,13 +281,13 @@ export default function FlashcardViewer({
 
       {/* Swipe labels */}
       <motion.div
-        className="absolute top-4 left-4 z-20 px-3 py-1 rounded-lg bg-red-500 text-white text-sm font-bold pointer-events-none"
+        className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 px-3 py-1 rounded-lg bg-red-500 text-white text-sm font-bold pointer-events-none"
         style={{ opacity: bgLeft }}
       >
         Chưa nhớ
       </motion.div>
       <motion.div
-        className="absolute top-4 right-14 z-20 px-3 py-1 rounded-lg bg-green-500 text-white text-sm font-bold pointer-events-none"
+        className="absolute top-3 right-14 sm:top-4 sm:right-14 z-20 px-3 py-1 rounded-lg bg-green-500 text-white text-sm font-bold pointer-events-none"
         style={{ opacity: bgRight }}
       >
         Đã nhớ
