@@ -1,12 +1,12 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { useAdminStore } from '../store/useAdminStore'
-import { isGistConfigured, getGistConfig, fetchGist, updateGist } from '../lib/gistSync'
+import { isGistConfigured, getGistConfig, fetchGist, updateGist, resetETagCache } from '../lib/gistSync'
 import type { GistSyncData } from '../lib/gistSync'
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error'
 
-const CHECK_INTERVAL = 5 * 60_000 // Kiểm tra data mới mỗi 5 phút (GitHub API limit: 60 req/h cho unauthenticated)
+const CHECK_INTERVAL = 30_000 // 30 giây — an toàn nhờ ETag (304 không tốn rate limit)
 
 export function useGistSync() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
@@ -93,6 +93,7 @@ export function useGistSync() {
 
       const success = await updateGist(token, gistId, data)
       if (success) {
+        resetETagCache() // Xóa ETag cũ để lần check tiếp lấy data mới từ server
         setSyncStatus('synced')
         setLastSyncedAt(Date.now())
         setHasUnsyncedChanges(false)

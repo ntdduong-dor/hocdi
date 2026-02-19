@@ -53,6 +53,10 @@ function authHeaders(token: string) {
   }
 }
 
+// --- ETag cache: conditional request, 304 không tốn rate limit ---
+let cachedETag: string | null = null
+let cachedData: GistSyncData | null = null
+
 /** Create a new public Gist with app data, returns gist ID */
 export async function createGist(token: string, data: GistSyncData): Promise<string> {
   const res = await fetch(`${API_BASE}/gists`, {
@@ -78,18 +82,32 @@ export async function createGist(token: string, data: GistSyncData): Promise<str
   return gist.id
 }
 
-/** Fetch data from a public Gist — KHÔNG cần token */
+/** Fetch data from a public Gist — KHÔNG cần token, dùng ETag để tiết kiệm rate limit */
 export async function fetchGist(gistId: string): Promise<GistSyncData | null> {
   try {
-    const res = await fetch(`${API_BASE}/gists/${gistId}`, {
-      headers: { Accept: 'application/vnd.github+json' },
-    })
+    const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
+    if (cachedETag) {
+      headers['If-None-Match'] = cachedETag
+    }
+
+    const res = await fetch(`${API_BASE}/gists/${gistId}`, { headers })
+
+    // 304 Not Modified → data không thay đổi, trả cache (KHÔNG tốn rate limit)
+    if (res.status === 304) {
+      return cachedData
+    }
 
     if (res.status === 404) {
       throw new Error('Gist không tồn tại. Có thể đã bị xóa.')
     }
     if (!res.ok) {
       throw new Error(`Lỗi khi đọc Gist (${res.status})`)
+    }
+
+    // Lưu ETag mới
+    const etag = res.headers.get('etag')
+    if (etag) {
+      cachedETag = etag
     }
 
     const gist = await res.json()
@@ -103,16 +121,26 @@ export async function fetchGist(gistId: string): Promise<GistSyncData | null> {
       return null
     }
 
-    return {
+    const data: GistSyncData = {
       folders: parsed.folders || [],
       lessons: parsed.lessons || [],
       kanjiLessons: parsed.kanjiLessons || [],
       _lastModified: parsed._lastModified || 0,
     }
+
+    // Cache data
+    cachedData = data
+    return data
   } catch (err) {
     if (err instanceof SyntaxError) return null
     throw err
   }
+}
+
+/** Reset ETag cache — gọi sau khi push để lần check tiếp lấy data mới */
+export function resetETagCache() {
+  cachedETag = null
+  cachedData = null
 }
 
 /** Update an existing Gist with new data — CẦN token */
