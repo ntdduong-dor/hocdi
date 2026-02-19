@@ -6,8 +6,7 @@ import type { GistSyncData } from '../lib/gistSync'
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error'
 
-const CHECK_INTERVAL = 30_000 // Kiểm tra data mới mỗi 30 giây
-const AUTO_PULL_INTERVAL = 2 * 60 * 60_000 // Tự động pull mỗi 2 tiếng (cho user)
+const CHECK_INTERVAL = 5 * 60_000 // Kiểm tra data mới mỗi 5 phút (GitHub API limit: 60 req/h cho unauthenticated)
 
 export function useGistSync() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
@@ -111,6 +110,8 @@ export function useGistSync() {
   }, [writable])
 
   // ---- CHECK: kiểm tra xem remote có data mới không ----
+  // Nếu là user (không phải admin) → tự động pull luôn
+  // Nếu là admin → chỉ set flag để hiện thông báo
   const checkForUpdates = useCallback(async () => {
     if (!configured || isPulling.current || isSyncing.current) return
 
@@ -123,7 +124,34 @@ export function useGistSync() {
       const remoteLastModified = remoteData._lastModified || 0
 
       if (remoteLastModified > localLastModified) {
-        setHasRemoteUpdate(true)
+        const currentIsAdmin = useAdminStore.getState().isAdmin
+
+        if (!currentIsAdmin) {
+          // User: tự động pull luôn, xóa data cũ rồi ghi mới
+          isPulling.current = true
+          setSyncStatus('syncing')
+
+          useAppStore.setState({
+            folders: [],
+            lessons: [],
+            kanjiLessons: [],
+            _lastModified: 0,
+          })
+          useAppStore.setState({
+            folders: remoteData.folders,
+            lessons: remoteData.lessons,
+            kanjiLessons: remoteData.kanjiLessons,
+            _lastModified: remoteData._lastModified,
+          })
+
+          setSyncStatus('synced')
+          setLastSyncedAt(Date.now())
+          setHasRemoteUpdate(false)
+          isPulling.current = false
+        } else {
+          // Admin: chỉ hiện thông báo, không tự pull (tránh ghi đè đang sửa)
+          setHasRemoteUpdate(true)
+        }
       }
     } catch {
       // Lỗi check im lặng, không làm gì
@@ -146,17 +174,6 @@ export function useGistSync() {
 
     return () => clearInterval(interval)
   }, [configured, checkForUpdates])
-
-  // Auto-pull mỗi 2 phút cho user (không phải admin)
-  useEffect(() => {
-    if (!configured || isAdmin) return
-
-    const interval = setInterval(() => {
-      pullFromGist()
-    }, AUTO_PULL_INTERVAL)
-
-    return () => clearInterval(interval)
-  }, [configured, isAdmin, pullFromGist])
 
   // Theo dõi thay đổi store → đánh dấu dirty (cho admin push)
   useEffect(() => {
