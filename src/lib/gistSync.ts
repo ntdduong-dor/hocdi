@@ -3,6 +3,26 @@ import type { Folder, Lesson, KanjiLesson } from '../types'
 const API_BASE = 'https://api.github.com'
 const GIST_FILENAME = 'kanji-app-data.json'
 
+// ---- Hardcoded config ----
+// Token chỉ cần khi GHI (push) dữ liệu lên Gist
+// ĐỌC từ public Gist thì không cần token
+const GIST_TOKEN = 'YOUR_GITHUB_PAT_HERE'
+const GIST_ID = '' // Paste gist ID vào đây sau khi tạo xong
+
+export function getGistConfig() {
+  return { token: GIST_TOKEN, gistId: GIST_ID }
+}
+
+/** Gist đã được cấu hình (có ID) → có thể đọc */
+export function isGistConfigured(): boolean {
+  return !!(GIST_ID)
+}
+
+/** Có token → có thể ghi */
+export function canWriteGist(): boolean {
+  return !!(GIST_TOKEN && GIST_TOKEN !== 'YOUR_GITHUB_PAT_HERE' && GIST_ID)
+}
+
 export interface GistSyncData {
   folders: Folder[]
   lessons: Lesson[]
@@ -10,7 +30,7 @@ export interface GistSyncData {
   _lastModified: number
 }
 
-function headers(token: string) {
+function authHeaders(token: string) {
   return {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
@@ -18,26 +38,14 @@ function headers(token: string) {
   }
 }
 
-/** Validate GitHub PAT — returns username if valid, null if invalid */
-export async function validateToken(token: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${API_BASE}/user`, { headers: headers(token) })
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.login || null
-  } catch {
-    return null
-  }
-}
-
-/** Create a new private Gist with app data, returns gist ID */
+/** Create a new public Gist with app data, returns gist ID */
 export async function createGist(token: string, data: GistSyncData): Promise<string> {
   const res = await fetch(`${API_BASE}/gists`, {
     method: 'POST',
-    headers: headers(token),
+    headers: authHeaders(token),
     body: JSON.stringify({
       description: 'Học Đi - Kanji App Data (auto-sync)',
-      public: false,
+      public: true,
       files: {
         [GIST_FILENAME]: {
           content: JSON.stringify(data, null, 2),
@@ -55,16 +63,15 @@ export async function createGist(token: string, data: GistSyncData): Promise<str
   return gist.id
 }
 
-/** Fetch data from an existing Gist, returns null if not found or invalid */
-export async function fetchGist(token: string, gistId: string): Promise<GistSyncData | null> {
+/** Fetch data from a public Gist — KHÔNG cần token */
+export async function fetchGist(gistId: string): Promise<GistSyncData | null> {
   try {
-    const res = await fetch(`${API_BASE}/gists/${gistId}`, { headers: headers(token) })
+    const res = await fetch(`${API_BASE}/gists/${gistId}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    })
 
     if (res.status === 404) {
       throw new Error('Gist không tồn tại. Có thể đã bị xóa.')
-    }
-    if (res.status === 401) {
-      throw new Error('Token không hợp lệ hoặc đã hết hạn.')
     }
     if (!res.ok) {
       throw new Error(`Lỗi khi đọc Gist (${res.status})`)
@@ -77,7 +84,6 @@ export async function fetchGist(token: string, gistId: string): Promise<GistSync
 
     const parsed = JSON.parse(file.content)
 
-    // Validate basic shape
     if (!Array.isArray(parsed.folders) || !Array.isArray(parsed.lessons)) {
       return null
     }
@@ -94,41 +100,26 @@ export async function fetchGist(token: string, gistId: string): Promise<GistSync
   }
 }
 
-/** Update an existing Gist with new data, returns true on success */
+/** Update an existing Gist with new data — CẦN token */
 export async function updateGist(token: string, gistId: string, data: GistSyncData): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE}/gists/${gistId}`, {
-      method: 'PATCH',
-      headers: headers(token),
-      body: JSON.stringify({
-        files: {
-          [GIST_FILENAME]: {
-            content: JSON.stringify(data, null, 2),
-          },
+  const res = await fetch(`${API_BASE}/gists/${gistId}`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      files: {
+        [GIST_FILENAME]: {
+          content: JSON.stringify(data, null, 2),
         },
-      }),
-    })
+      },
+    }),
+  })
 
-    if (res.status === 401) {
-      throw new Error('Token không hợp lệ hoặc đã hết hạn.')
-    }
-    if (res.status === 404) {
-      throw new Error('Gist không tồn tại. Có thể đã bị xóa.')
-    }
-
-    return res.ok
-  } catch (err) {
-    throw err
+  if (res.status === 401) {
+    throw new Error('Token không hợp lệ hoặc đã hết hạn.')
   }
-}
+  if (res.status === 404) {
+    throw new Error('Gist không tồn tại. Có thể đã bị xóa.')
+  }
 
-/** Extract gist ID from a full URL or raw ID string */
-export function parseGistId(input: string): string {
-  const trimmed = input.trim()
-  // Full URL: https://gist.github.com/user/abc123...
-  const urlMatch = trimmed.match(/gist\.github\.com\/[^/]+\/([a-f0-9]+)/i)
-  if (urlMatch) return urlMatch[1]
-  // Raw ID (hex string)
-  if (/^[a-f0-9]+$/i.test(trimmed)) return trimmed
-  return trimmed
+  return res.ok
 }

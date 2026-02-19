@@ -1,24 +1,30 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { useGistStore } from '../store/useGistStore'
-import { fetchGist, updateGist } from '../lib/gistSync'
+import { isGistConfigured, canWriteGist, getGistConfig, fetchGist, updateGist } from '../lib/gistSync'
 import type { GistSyncData } from '../lib/gistSync'
 
-const DEBOUNCE_MS = 2000
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error'
 
 export function useGistSync() {
-  const { token, gistId, setSyncStatus, setLastSyncedAt } = useGistStore()
-  const isConfigured = !!(token && gistId)
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null)
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false)
+  const [changeCount, setChangeCount] = useState(0)
+
   const isSyncing = useRef(false)
   const isPulling = useRef(false)
+  const configured = isGistConfigured()
+  const writable = canWriteGist()
 
   const pushToGist = useCallback(async () => {
-    if (isSyncing.current || !token || !gistId) return
+    if (isSyncing.current || !writable) return
     isSyncing.current = true
     setSyncStatus('syncing')
+    setSyncError(null)
 
     try {
+      const { token, gistId } = getGistConfig()
       const state = useAppStore.getState()
       const now = Date.now()
       const data: GistSyncData = {
@@ -28,39 +34,44 @@ export function useGistSync() {
         _lastModified: now,
       }
 
-      // Update local _lastModified
       useAppStore.setState({ _lastModified: now })
 
       const success = await updateGist(token, gistId, data)
       if (success) {
         setSyncStatus('synced')
         setLastSyncedAt(Date.now())
+        setHasUnsyncedChanges(false)
+        setChangeCount(0)
       } else {
-        setSyncStatus('error', 'Không thể cập nhật Gist')
+        setSyncStatus('error')
+        setSyncError('Không thể cập nhật Gist')
       }
     } catch (err) {
-      setSyncStatus('error', err instanceof Error ? err.message : 'Lỗi đồng bộ')
+      setSyncStatus('error')
+      setSyncError(err instanceof Error ? err.message : 'Lỗi đồng bộ')
     } finally {
       isSyncing.current = false
     }
-  }, [token, gistId, setSyncStatus, setLastSyncedAt])
+  }, [writable])
 
-  // Pull from Gist on mount
+  // Pull từ public Gist on mount (1 lần duy nhất, KHÔNG cần token)
   useEffect(() => {
-    if (!isConfigured || !token || !gistId) return
+    if (!configured) return
 
     const pullFromGist = async () => {
       if (isPulling.current) return
       isPulling.current = true
       setSyncStatus('syncing')
+      setSyncError(null)
 
       try {
-        const remoteData = await fetchGist(token, gistId)
+        const { gistId } = getGistConfig()
+        const remoteData = await fetchGist(gistId)
+
         if (!remoteData) {
-          // Gist exists but no valid data — push local data
-          await pushToGist()
-          setSyncStatus('synced')
-          setLastSyncedAt(Date.now())
+          isPulling.current = false
+          if (writable) await pushToGist()
+          else setSyncStatus('idle')
           return
         }
 
@@ -68,36 +79,36 @@ export function useGistSync() {
         const remoteLastModified = remoteData._lastModified || 0
 
         if (remoteLastModified > localLastModified) {
-          // Remote wins — replace local data
           useAppStore.setState({
             folders: remoteData.folders,
             lessons: remoteData.lessons,
             kanjiLessons: remoteData.kanjiLessons,
             _lastModified: remoteData._lastModified,
           })
-        } else if (localLastModified > remoteLastModified) {
-          // Local wins — push to remote
+        } else if (localLastModified > remoteLastModified && writable) {
+          isPulling.current = false
           await pushToGist()
+          return
         }
 
         setSyncStatus('synced')
         setLastSyncedAt(Date.now())
       } catch (err) {
-        setSyncStatus('error', err instanceof Error ? err.message : 'Lỗi đồng bộ')
+        setSyncStatus('error')
+        setSyncError(err instanceof Error ? err.message : 'Lỗi đồng bộ')
       } finally {
         isPulling.current = false
       }
     }
 
     pullFromGist()
-  }, [isConfigured, token, gistId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [configured]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Subscribe to store changes for debounced push
+  // Theo dõi thay đổi store → đánh dấu dirty (không auto push)
   useEffect(() => {
-    if (!isConfigured || !token || !gistId) return
+    if (!configured) return
 
     const unsub = useAppStore.subscribe((state, prevState) => {
-      // Only sync if domain data actually changed
       if (
         state.folders === prevState.folders &&
         state.lessons === prevState.lessons &&
@@ -106,21 +117,22 @@ export function useGistSync() {
         return
       }
 
-      // Skip if currently pulling (avoid push loop)
       if (isPulling.current) return
 
-      // Debounce push
-      if (debounceTimer.current) clearTimeout(debounceTimer.current)
-      debounceTimer.current = setTimeout(() => {
-        pushToGist()
-      }, DEBOUNCE_MS)
+      setHasUnsyncedChanges(true)
+      setChangeCount((c) => c + 1)
     })
 
-    return () => {
-      unsub()
-      if (debounceTimer.current) clearTimeout(debounceTimer.current)
-    }
-  }, [isConfigured, token, gistId, pushToGist])
+    return () => unsub()
+  }, [configured])
 
-  return { pushToGist, isConfigured }
+  return {
+    pushToGist,
+    syncStatus,
+    syncError,
+    lastSyncedAt,
+    configured,
+    hasUnsyncedChanges,
+    changeCount,
+  }
 }

@@ -1,10 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import Header from './Header'
-import { useGistSync } from '../../hooks/useGistSync'
 
 export default function Layout() {
-  useGistSync()
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />

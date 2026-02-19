@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { BookOpen, Home, ShieldCheck, ShieldOff, LogOut, X } from 'lucide-react'
 import { useAdminStore } from '../../store/useAdminStore'
 import SyncStatusIndicator from '../gist/SyncStatusIndicator'
-import GistSyncSetup from '../gist/GistSyncSetup'
 
 export default function Header() {
   const location = useLocation()
@@ -11,7 +10,6 @@ export default function Header() {
   const { isAdmin, login, logout } = useAdminStore()
 
   const [showLogin, setShowLogin] = useState(false)
-  const [showGistSetup, setShowGistSetup] = useState(false)
   const [code, setCode] = useState('')
   const [error, setError] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -53,12 +51,7 @@ export default function Header() {
   }
 
   const handleAdminClick = () => {
-    if (isAdmin) {
-      // Already admin — show logout option
-      setShowLogin(true)
-    } else {
-      setShowLogin(true)
-    }
+    setShowLogin(true)
   }
 
   return (
@@ -80,8 +73,8 @@ export default function Header() {
             </Link>
           )}
 
-          {/* Sync status */}
-          <SyncStatusIndicator onSetupClick={() => setShowGistSetup(true)} />
+          {/* Sync button */}
+          <SyncStatusIndicator />
 
           {/* Admin button */}
           <div className="relative" ref={panelRef}>
@@ -154,7 +147,6 @@ export default function Header() {
           </div>
         </div>
       </div>
-      <GistSyncSetup isOpen={showGistSetup} onClose={() => setShowGistSetup(false)} />
     </header>
   )
 }

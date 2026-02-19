@@ -1,11 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Cloud, CloudOff, RefreshCw, Check, X, Unplug } from 'lucide-react'
-import { useGistStore } from '../../store/useGistStore'
+import { RefreshCw, Check, AlertCircle, Upload } from 'lucide-react'
 import { useGistSync } from '../../hooks/useGistSync'
-
-interface SyncStatusIndicatorProps {
-  onSetupClick: () => void
-}
 
 function formatTimeAgo(timestamp: number): string {
   const diff = Math.floor((Date.now() - timestamp) / 1000)
@@ -15,59 +9,44 @@ function formatTimeAgo(timestamp: number): string {
   return `${Math.floor(diff / 86400)} ngày trước`
 }
 
-export default function SyncStatusIndicator({ onSetupClick }: SyncStatusIndicatorProps) {
-  const { token, gistId, syncStatus, lastSyncedAt, syncError, clearConfig } = useGistStore()
-  const { pushToGist } = useGistSync()
-  const isConfigured = !!(token && gistId)
+export default function SyncStatusIndicator() {
+  const {
+    pushToGist,
+    syncStatus,
+    syncError,
+    lastSyncedAt,
+    configured,
+    hasUnsyncedChanges,
+    changeCount,
+  } = useGistSync()
 
-  const [showPanel, setShowPanel] = useState(false)
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  // Close panel on outside click
-  useEffect(() => {
-    if (!showPanel) return
-    const handleClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setShowPanel(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [showPanel])
+  if (!configured) return null
 
   const handleClick = () => {
-    if (!isConfigured) {
-      onSetupClick()
-    } else {
-      setShowPanel((v) => !v)
+    if (syncStatus !== 'syncing') {
+      pushToGist()
     }
   }
 
-  const handleDisconnect = () => {
-    clearConfig()
-    setShowPanel(false)
-  }
-
-  const handleSyncNow = () => {
-    pushToGist()
-  }
+  // Ưu tiên: có thay đổi chưa sync > trạng thái sync
+  const showDirty = hasUnsyncedChanges && syncStatus !== 'syncing'
 
   const getIcon = () => {
-    if (!isConfigured) return <Cloud size={18} />
+    if (showDirty) return <Upload size={18} />
     switch (syncStatus) {
       case 'syncing':
         return <RefreshCw size={18} className="animate-spin" />
       case 'synced':
         return <Check size={18} />
       case 'error':
-        return <CloudOff size={18} />
+        return <AlertCircle size={18} />
       default:
-        return <Cloud size={18} />
+        return <RefreshCw size={18} />
     }
   }
 
   const getColorClass = () => {
-    if (!isConfigured) return 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+    if (showDirty) return 'text-orange-600 bg-orange-50 hover:bg-orange-100'
     switch (syncStatus) {
       case 'syncing':
         return 'text-blue-600 bg-blue-50'
@@ -76,92 +55,51 @@ export default function SyncStatusIndicator({ onSetupClick }: SyncStatusIndicato
       case 'error':
         return 'text-red-600 bg-red-50 hover:bg-red-100'
       default:
-        return 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+        return 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+    }
+  }
+
+  const getTitle = () => {
+    if (showDirty) return `Có ${changeCount} thay đổi chưa đồng bộ — Bấm để đồng bộ`
+    const timeStr = lastSyncedAt ? ` · ${formatTimeAgo(lastSyncedAt)}` : ''
+    switch (syncStatus) {
+      case 'syncing':
+        return 'Đang đồng bộ...'
+      case 'synced':
+        return `Đã đồng bộ${timeStr}`
+      case 'error':
+        return syncError || 'Lỗi đồng bộ'
+      default:
+        return 'Bấm để đồng bộ'
     }
   }
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative flex items-center gap-2">
       <button
         onClick={handleClick}
-        className={`p-2 rounded-lg transition-colors ${getColorClass()}`}
-        title={
-          !isConfigured
-            ? 'Cài đặt đồng bộ Gist'
-            : syncStatus === 'synced'
-              ? `Đã đồng bộ${lastSyncedAt ? ` · ${formatTimeAgo(lastSyncedAt)}` : ''}`
-              : syncStatus === 'syncing'
-                ? 'Đang đồng bộ...'
-                : syncStatus === 'error'
-                  ? 'Lỗi đồng bộ'
-                  : 'Đồng bộ Gist'
-        }
+        disabled={syncStatus === 'syncing'}
+        className={`relative p-2 rounded-lg transition-colors disabled:cursor-wait ${getColorClass()}`}
+        title={getTitle()}
       >
         {getIcon()}
+
+        {/* Badge số thay đổi */}
+        {showDirty && (
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">
+            {changeCount > 9 ? '9+' : changeCount}
+          </span>
+        )}
       </button>
 
-      {showPanel && isConfigured && (
-        <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 p-4 z-50">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-gray-700">Đồng bộ Gist</span>
-            <button
-              onClick={() => setShowPanel(false)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Status */}
-          <div className="mb-3">
-            {syncStatus === 'synced' && (
-              <p className="text-sm text-green-600 flex items-center gap-1.5">
-                <Check size={16} /> Đã đồng bộ
-              </p>
-            )}
-            {syncStatus === 'syncing' && (
-              <p className="text-sm text-blue-600 flex items-center gap-1.5">
-                <RefreshCw size={16} className="animate-spin" /> Đang đồng bộ...
-              </p>
-            )}
-            {syncStatus === 'error' && (
-              <div>
-                <p className="text-sm text-red-600 flex items-center gap-1.5">
-                  <CloudOff size={16} /> Lỗi đồng bộ
-                </p>
-                {syncError && (
-                  <p className="text-xs text-red-500 mt-1">{syncError}</p>
-                )}
-              </div>
-            )}
-            {syncStatus === 'idle' && (
-              <p className="text-sm text-gray-500">Sẵn sàng</p>
-            )}
-          </div>
-
-          {lastSyncedAt && (
-            <p className="text-xs text-gray-400 mb-3">
-              Lần cuối: {formatTimeAgo(lastSyncedAt)}
-            </p>
-          )}
-
-          {/* Actions */}
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={handleSyncNow}
-              disabled={syncStatus === 'syncing'}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw size={14} /> Đồng bộ ngay
-            </button>
-            <button
-              onClick={handleDisconnect}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-            >
-              <Unplug size={14} /> Ngắt kết nối
-            </button>
-          </div>
-        </div>
+      {/* Tin nhắn khi có thay đổi */}
+      {showDirty && (
+        <span
+          onClick={handleClick}
+          className="hidden sm:block text-xs text-orange-600 font-medium cursor-pointer hover:underline"
+        >
+          Chưa đồng bộ
+        </span>
       )}
     </div>
   )
