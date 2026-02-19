@@ -20,32 +20,29 @@ export default function SyncStatusIndicator() {
     isAdmin,
     hasUnsyncedChanges,
     changeCount,
-    hasRemoteUpdate,
   } = useGistSync()
 
   const isBusy = syncStatus === 'syncing'
 
-  // Trạng thái thông báo
+  // Admin có token + có thay đổi
   const showPush = hasUnsyncedChanges && writable && !isBusy
+  // Admin chưa nhập token nhưng có thay đổi
   const showNeedToken = hasUnsyncedChanges && isAdmin && !writable && !isBusy
-  const showPull = hasRemoteUpdate && !isBusy && !showPush && !showNeedToken
 
-  // --- Nút bấm thủ công: luôn hiện ---
-  const handleManualSync = () => {
+  // --- Pull: tải data từ Gist ---
+  const handlePull = async () => {
     if (isBusy) return
-    if (writable) {
-      pushToGist()
-    } else {
-      pullFromGist()
-    }
+    await pullFromGist()
+    window.location.reload()
   }
 
-  const syncButtonTitle = () => {
-    if (isBusy) return 'Đang đồng bộ...'
-    const timeStr = lastSyncedAt ? `Lần cuối: ${formatTimeAgo(lastSyncedAt)}` : ''
-    if (writable) return `Đẩy dữ liệu lên Gist${timeStr ? ` · ${timeStr}` : ''}`
-    return `Tải dữ liệu từ Gist${timeStr ? ` · ${timeStr}` : ''}`
+  // --- Push: đẩy data lên Gist ---
+  const handlePush = () => {
+    if (isBusy) return
+    pushToGist()
   }
+
+  const timeStr = lastSyncedAt ? formatTimeAgo(lastSyncedAt) : ''
 
   // --- Thông báo trạng thái ---
   const getNotification = () => {
@@ -61,21 +58,14 @@ export default function SyncStatusIndicator() {
       text: `${changeCount} thay đổi chưa đồng bộ`,
       color: 'text-orange-600 bg-orange-50',
       dotColor: 'bg-orange-500',
-      onClick: () => pushToGist(),
-    }
-    if (showPull) return {
-      icon: <Download size={14} />,
-      text: 'Có bài học mới',
-      color: 'text-blue-600 bg-blue-50',
-      dotColor: 'bg-blue-500',
-      onClick: () => pullFromGist(),
+      onClick: handlePush,
     }
     if (syncStatus === 'error') return {
       icon: <AlertCircle size={14} />,
       text: syncError || 'Lỗi đồng bộ',
       color: 'text-red-600 bg-red-50',
       dotColor: 'bg-red-500',
-      onClick: () => pullFromGist(),
+      onClick: handlePull,
     }
     return null
   }
@@ -84,9 +74,9 @@ export default function SyncStatusIndicator() {
 
   return (
     <div className="flex items-center gap-2">
-      {/* Nút đồng bộ thủ công — luôn hiện */}
+      {/* Nút Pull — luôn hiện */}
       <button
-        onClick={handleManualSync}
+        onClick={handlePull}
         disabled={isBusy}
         className={`p-2 rounded-lg transition-colors disabled:cursor-wait ${
           isBusy
@@ -95,18 +85,39 @@ export default function SyncStatusIndicator() {
               ? 'text-green-600 bg-green-50 hover:bg-green-100'
               : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
         }`}
-        title={syncButtonTitle()}
+        title={isBusy ? 'Đang đồng bộ...' : `Tải dữ liệu từ Gist${timeStr ? ` · ${timeStr}` : ''}`}
       >
         {isBusy ? (
           <RefreshCw size={18} className="animate-spin" />
         ) : syncStatus === 'synced' ? (
           <Check size={18} />
         ) : (
-          <RefreshCw size={18} />
+          <Download size={18} />
         )}
       </button>
 
-      {/* Thông báo trạng thái — chỉ hiện khi có sự kiện */}
+      {/* Nút Push — chỉ hiện khi admin có token */}
+      {writable && (
+        <button
+          onClick={handlePush}
+          disabled={isBusy}
+          className={`relative p-2 rounded-lg transition-colors disabled:cursor-wait ${
+            showPush
+              ? 'text-orange-600 bg-orange-50 hover:bg-orange-100'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+          }`}
+          title={showPush ? `Đẩy ${changeCount} thay đổi lên Gist` : 'Đẩy dữ liệu lên Gist'}
+        >
+          <Upload size={18} />
+          {showPush && (
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">
+              {changeCount > 9 ? '9+' : changeCount}
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* Thông báo trạng thái */}
       {notification && (
         <button
           onClick={notification.onClick}
