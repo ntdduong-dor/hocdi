@@ -7,6 +7,7 @@ import type { GistSyncData } from '../lib/gistSync'
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error'
 
 const CHECK_INTERVAL = 30_000 // Kiểm tra data mới mỗi 30 giây
+const AUTO_PULL_INTERVAL = 2 * 60 * 60_000 // Tự động pull mỗi 2 tiếng (cho user)
 
 export function useGistSync() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
@@ -44,17 +45,21 @@ export function useGistSync() {
         return
       }
 
-      const localLastModified = useAppStore.getState()._lastModified || 0
-      const remoteLastModified = remoteData._lastModified || 0
+      // Xóa hết data cũ rồi ghi data mới từ remote
+      useAppStore.setState({
+        folders: [],
+        lessons: [],
+        kanjiLessons: [],
+        _lastModified: 0,
+      })
 
-      if (remoteLastModified > localLastModified) {
-        useAppStore.setState({
-          folders: remoteData.folders,
-          lessons: remoteData.lessons,
-          kanjiLessons: remoteData.kanjiLessons,
-          _lastModified: remoteData._lastModified,
-        })
-      }
+      // Ghi data mới từ Gist
+      useAppStore.setState({
+        folders: remoteData.folders,
+        lessons: remoteData.lessons,
+        kanjiLessons: remoteData.kanjiLessons,
+        _lastModified: remoteData._lastModified,
+      })
 
       setSyncStatus('synced')
       setLastSyncedAt(Date.now())
@@ -131,7 +136,7 @@ export function useGistSync() {
     pullFromGist()
   }, [configured]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Kiểm tra data mới định kỳ (polling)
+  // Kiểm tra data mới định kỳ (polling) — mỗi 30 giây
   useEffect(() => {
     if (!configured) return
 
@@ -141,6 +146,17 @@ export function useGistSync() {
 
     return () => clearInterval(interval)
   }, [configured, checkForUpdates])
+
+  // Auto-pull mỗi 2 phút cho user (không phải admin)
+  useEffect(() => {
+    if (!configured || isAdmin) return
+
+    const interval = setInterval(() => {
+      pullFromGist()
+    }, AUTO_PULL_INTERVAL)
+
+    return () => clearInterval(interval)
+  }, [configured, isAdmin, pullFromGist])
 
   // Theo dõi thay đổi store → đánh dấu dirty (cho admin push)
   useEffect(() => {

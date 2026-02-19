@@ -1,4 +1,4 @@
-import { RefreshCw, Check, AlertCircle, Upload, Download } from 'lucide-react'
+import { RefreshCw, Check, AlertCircle, Upload, Download, CloudOff } from 'lucide-react'
 import { useGistSync } from '../../hooks/useGistSync'
 
 function formatTimeAgo(timestamp: number): string {
@@ -16,36 +16,41 @@ export default function SyncStatusIndicator() {
     syncStatus,
     syncError,
     lastSyncedAt,
-    configured,
     writable,
+    isAdmin,
     hasUnsyncedChanges,
     changeCount,
     hasRemoteUpdate,
   } = useGistSync()
 
-  if (!configured) return null
-
   const isBusy = syncStatus === 'syncing'
 
-  // Admin: có thay đổi local chưa push
+  // Admin đã có token: có thay đổi local chưa push
   const showPush = hasUnsyncedChanges && writable && !isBusy
+  // Admin chưa nhập token nhưng có thay đổi → cảnh báo cần kết nối
+  const showNeedToken = hasUnsyncedChanges && isAdmin && !writable && !isBusy
   // User: có data mới trên remote chưa pull
-  const showPull = hasRemoteUpdate && !isBusy && !showPush
+  const showPull = hasRemoteUpdate && !isBusy && !showPush && !showNeedToken
 
   const handleClick = () => {
     if (isBusy) return
     if (showPush) {
       pushToGist()
+    } else if (showNeedToken) {
+      // Admin cần nhập token trước
+      return
     } else if (showPull) {
       pullFromGist()
     } else if (writable) {
       pushToGist()
     } else {
+      // Mặc định: pull dữ liệu từ Gist
       pullFromGist()
     }
   }
 
   const getIcon = () => {
+    if (showNeedToken) return <CloudOff size={18} />
     if (showPush) return <Upload size={18} />
     if (showPull) return <Download size={18} />
     switch (syncStatus) {
@@ -61,6 +66,7 @@ export default function SyncStatusIndicator() {
   }
 
   const getColorClass = () => {
+    if (showNeedToken) return 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100'
     if (showPush) return 'text-orange-600 bg-orange-50 hover:bg-orange-100'
     if (showPull) return 'text-blue-600 bg-blue-50 hover:bg-blue-100'
     switch (syncStatus) {
@@ -76,6 +82,7 @@ export default function SyncStatusIndicator() {
   }
 
   const getTitle = () => {
+    if (showNeedToken) return 'Cần kết nối GitHub Gist token để đồng bộ'
     if (showPush) return `Có ${changeCount} thay đổi chưa đồng bộ — Bấm để đẩy lên`
     if (showPull) return 'Có bài học mới — Bấm để cập nhật'
     const timeStr = lastSyncedAt ? ` · ${formatTimeAgo(lastSyncedAt)}` : ''
@@ -87,17 +94,19 @@ export default function SyncStatusIndicator() {
       case 'error':
         return syncError || 'Lỗi đồng bộ'
       default:
-        return 'Bấm để đồng bộ'
+        return 'Bấm để tải dữ liệu từ Gist'
     }
   }
 
   const getMessage = () => {
+    if (showNeedToken) return 'Cần kết nối Gist'
     if (showPush) return 'Chưa đồng bộ'
     if (showPull) return 'Có bài học mới'
     return null
   }
 
   const getMessageColor = () => {
+    if (showNeedToken) return 'text-yellow-600'
     if (showPush) return 'text-orange-600'
     if (showPull) return 'text-blue-600'
     return ''
@@ -115,10 +124,15 @@ export default function SyncStatusIndicator() {
       >
         {getIcon()}
 
-        {/* Badge: push count hoặc pull dot */}
+        {/* Badge: push count hoặc need-token warning */}
         {showPush && (
           <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">
             {changeCount > 9 ? '9+' : changeCount}
+          </span>
+        )}
+        {showNeedToken && (
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-yellow-500 px-1 text-[10px] font-bold text-white">
+            !
           </span>
         )}
         {showPull && (
