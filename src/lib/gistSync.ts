@@ -5,7 +5,7 @@ const API_BASE = 'https://api.github.com'
 const GIST_FILENAME = 'kanji-app-data.json'
 
 // Gist ID là public, hardcode được
-const GIST_ID = '' // Paste gist ID vào đây sau khi tạo xong
+const GIST_ID = '65e308653d247b189d7a07e1d2e9ee0c'
 
 export function getGistConfig() {
   const token = useAdminStore.getState().gistToken || ''
@@ -28,6 +28,21 @@ export interface GistSyncData {
   lessons: Lesson[]
   kanjiLessons: KanjiLesson[]
   _lastModified: number
+}
+
+/** Validate token bằng cách thử đọc Gist với auth — trả về true nếu có quyền ghi */
+export async function validateTokenWithGist(token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/gists/${GIST_ID}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+      },
+    })
+    return res.ok
+  } catch {
+    return false
+  }
 }
 
 function authHeaders(token: string) {
