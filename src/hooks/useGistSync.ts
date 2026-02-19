@@ -21,6 +21,7 @@ export function useGistSync() {
   const [hasRemoteUpdate, setHasRemoteUpdate] = useState(false)
 
   const gistToken = useAdminStore((s) => s.gistToken)
+  const isAdmin = useAdminStore((s) => s.isAdmin)
 
   const isSyncing = useRef(false)
   const isPulling = useRef(false)
@@ -172,6 +173,7 @@ export function useGistSync() {
     lastSyncedAt,
     configured,
     writable,
+    isAdmin,
     hasUnsyncedChanges,
     changeCount,
     hasRemoteUpdate,
