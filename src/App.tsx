@@ -9,6 +9,7 @@ import KanjiLessonPage from './components/kanji/KanjiLessonPage'
 import KanjiStudyPage from './components/kanji/KanjiStudyPage'
 import KanjiQuizPage from './components/kanji/KanjiQuizPage'
 import CreateKanjiLessonPage from './components/kanji/CreateKanjiLessonPage'
+import GrammarPage from './components/grammar/GrammarPage'
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="/kanji/:kanjiLessonId" element={<KanjiLessonPage />} />
           <Route path="/kanji/:kanjiLessonId/study" element={<KanjiStudyPage />} />
           <Route path="/kanji/:kanjiLessonId/quiz" element={<KanjiQuizPage />} />
+          <Route path="/grammar" element={<GrammarPage />} />
         </Route>
       </Routes>
     </HashRouter>

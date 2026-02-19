@@ -9,7 +9,7 @@ import FolderFormModal from '../folder/FolderFormModal'
 import LessonFormModal from '../lesson/LessonFormModal'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import EmptyState from '../ui/EmptyState'
-import { FolderPlus, FilePlus, BookOpen } from 'lucide-react'
+import { FolderPlus, FilePlus, BookOpen, Languages } from 'lucide-react'
 import type { Folder, Lesson, KanjiLesson } from '../../types'
 
 export default function DashboardPage() {
@@ -212,6 +212,27 @@ export default function DashboardPage() {
           )}
         </>
       )}
+
+      {/* Grammar section */}
+      <div className="mb-8 mt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Ngữ pháp</h2>
+        </div>
+        <Link
+          to="/grammar"
+          className="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl hover:shadow-md hover:shadow-purple-100/50 hover:border-purple-300 transition-all group"
+        >
+          <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+            <Languages size={24} className="text-purple-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 group-hover:text-purple-700 transition-colors">
+              Tổng hợp ngữ pháp N3
+            </h3>
+            <p className="text-sm text-gray-500">Tra cứu cấu trúc, giải thích và ví dụ</p>
+          </div>
+        </Link>
+      </div>
 
       <FolderFormModal
         isOpen={folderModal}
