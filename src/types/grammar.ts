@@ -1,6 +1,7 @@
 export interface GrammarExample {
   ja: string
   vi: string
+  reading?: string
 }
 
 export interface GrammarPoint {

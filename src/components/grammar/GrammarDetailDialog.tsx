@@ -1,6 +1,46 @@
-import { X, BookOpen, Layers, MessageCircle } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { X, BookOpen, Layers, MessageCircle, Volume2, VolumeX } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { GrammarPoint } from '../../types/grammar'
+
+function useTTS() {
+  const [speakingIndex, setSpeakingIndex] = useState<number | null>(null)
+
+  const speak = useCallback((text: string, index: number) => {
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel()
+
+    if (speakingIndex === index) {
+      setSpeakingIndex(null)
+      return
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'ja-JP'
+    utterance.rate = 0.85
+    utterance.pitch = 1.0
+
+    // Try to find a Japanese voice
+    const voices = window.speechSynthesis.getVoices()
+    const jaVoice = voices.find(
+      (v) => v.lang === 'ja-JP' || v.lang.startsWith('ja')
+    )
+    if (jaVoice) utterance.voice = jaVoice
+
+    utterance.onend = () => setSpeakingIndex(null)
+    utterance.onerror = () => setSpeakingIndex(null)
+
+    setSpeakingIndex(index)
+    window.speechSynthesis.speak(utterance)
+  }, [speakingIndex])
+
+  const stop = useCallback(() => {
+    window.speechSynthesis.cancel()
+    setSpeakingIndex(null)
+  }, [])
+
+  return { speak, stop, speakingIndex }
+}
 
 interface GrammarDetailDialogProps {
   grammar: GrammarPoint | null
@@ -8,7 +48,14 @@ interface GrammarDetailDialogProps {
 }
 
 export default function GrammarDetailDialog({ grammar, onClose }: GrammarDetailDialogProps) {
+  const { speak, stop, speakingIndex } = useTTS()
+
   if (!grammar) return null
+
+  const handleClose = () => {
+    stop()
+    onClose()
+  }
 
   return (
     <AnimatePresence>
@@ -17,7 +64,7 @@ export default function GrammarDetailDialog({ grammar, onClose }: GrammarDetailD
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 pt-8 sm:pt-16 overflow-y-auto"
-        onClick={onClose}
+        onClick={handleClose}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -38,7 +85,7 @@ export default function GrammarDetailDialog({ grammar, onClose }: GrammarDetailD
               </p>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
             >
               <X size={20} />
@@ -94,9 +141,25 @@ export default function GrammarDetailDialog({ grammar, onClose }: GrammarDetailD
                     key={i}
                     className="rounded-lg border border-gray-100 overflow-hidden"
                   >
-                    <div className="px-3 sm:px-4 py-2.5 bg-gray-50 text-sm sm:text-base text-gray-900 font-medium leading-relaxed">
-                      <span className="text-xs text-gray-400 mr-2">{i + 1}.</span>
-                      {ex.ja}
+                    <div className="px-3 sm:px-4 py-2.5 bg-gray-50 text-sm sm:text-base text-gray-900 font-medium leading-relaxed flex items-start gap-2">
+                      <span className="text-xs text-gray-400 mr-0 mt-1 flex-shrink-0">{i + 1}.</span>
+                      <span className="flex-1">{ex.reading ? (
+                        <ruby className="leading-loose">
+                          {ex.ja}
+                          <rp>(</rp><rt className="text-[10px] text-gray-400 font-normal">{ex.reading}</rt><rp>)</rp>
+                        </ruby>
+                      ) : ex.ja}</span>
+                      <button
+                        onClick={() => speak(ex.ja, i)}
+                        className={`flex-shrink-0 p-1.5 rounded-lg transition-all ${
+                          speakingIndex === i
+                            ? 'text-orange-600 bg-orange-100 animate-pulse'
+                            : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50'
+                        }`}
+                        title={speakingIndex === i ? 'Đang phát...' : 'Nghe phát âm'}
+                      >
+                        {speakingIndex === i ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                      </button>
                     </div>
                     <div className="px-3 sm:px-4 py-2 text-sm text-blue-700 bg-blue-50/50 leading-relaxed">
                       → {ex.vi}
@@ -110,7 +173,7 @@ export default function GrammarDetailDialog({ grammar, onClose }: GrammarDetailD
           {/* Footer */}
           <div className="border-t border-gray-100 px-4 sm:px-6 py-3 flex justify-end rounded-b-2xl">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
             >
               Đóng

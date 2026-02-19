@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, BookOpen, ChevronLeft, X } from 'lucide-react'
-import { n3Grammar } from '../../data/grammar/n3-grammar'
+import { allN3Grammar as n3Grammar } from '../../data/grammar'
 import GrammarDetailDialog from './GrammarDetailDialog'
 import type { GrammarPoint } from '../../types/grammar'
 
