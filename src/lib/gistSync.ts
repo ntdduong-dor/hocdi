@@ -1,26 +1,26 @@
 import type { Folder, Lesson, KanjiLesson } from '../types'
+import { useAdminStore } from '../store/useAdminStore'
 
 const API_BASE = 'https://api.github.com'
 const GIST_FILENAME = 'kanji-app-data.json'
 
-// ---- Hardcoded config ----
-// Token chỉ cần khi GHI (push) dữ liệu lên Gist
-// ĐỌC từ public Gist thì không cần token
-const GIST_TOKEN = 'YOUR_GITHUB_PAT_HERE'
+// Gist ID là public, hardcode được
 const GIST_ID = '' // Paste gist ID vào đây sau khi tạo xong
 
 export function getGistConfig() {
-  return { token: GIST_TOKEN, gistId: GIST_ID }
+  const token = useAdminStore.getState().gistToken || ''
+  return { token, gistId: GIST_ID }
 }
 
 /** Gist đã được cấu hình (có ID) → có thể đọc */
 export function isGistConfigured(): boolean {
-  return !!(GIST_ID)
+  return !!GIST_ID
 }
 
-/** Có token → có thể ghi */
+/** Admin đã nhập token → có thể ghi */
 export function canWriteGist(): boolean {
-  return !!(GIST_TOKEN && GIST_TOKEN !== 'YOUR_GITHUB_PAT_HERE' && GIST_ID)
+  const token = useAdminStore.getState().gistToken
+  return !!(token && GIST_ID)
 }
 
 export interface GistSyncData {

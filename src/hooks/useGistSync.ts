@@ -1,22 +1,72 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { isGistConfigured, canWriteGist, getGistConfig, fetchGist, updateGist } from '../lib/gistSync'
+import { useAdminStore } from '../store/useAdminStore'
+import { isGistConfigured, getGistConfig, fetchGist, updateGist } from '../lib/gistSync'
 import type { GistSyncData } from '../lib/gistSync'
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error'
+
+const CHECK_INTERVAL = 30_000 // Kiểm tra data mới mỗi 30 giây
 
 export function useGistSync() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
   const [syncError, setSyncError] = useState<string | null>(null)
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null)
+
+  // Admin push: local thay đổi chưa push
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false)
   const [changeCount, setChangeCount] = useState(0)
+
+  // User pull: remote có data mới
+  const [hasRemoteUpdate, setHasRemoteUpdate] = useState(false)
+
+  const gistToken = useAdminStore((s) => s.gistToken)
 
   const isSyncing = useRef(false)
   const isPulling = useRef(false)
   const configured = isGistConfigured()
-  const writable = canWriteGist()
+  const writable = !!(gistToken && configured)
 
+  // ---- PULL: tải data từ Gist về local ----
+  const pullFromGist = useCallback(async () => {
+    if (isPulling.current || !configured) return
+    isPulling.current = true
+    setSyncStatus('syncing')
+    setSyncError(null)
+
+    try {
+      const { gistId } = getGistConfig()
+      const remoteData = await fetchGist(gistId)
+
+      if (!remoteData) {
+        setSyncStatus('idle')
+        return
+      }
+
+      const localLastModified = useAppStore.getState()._lastModified || 0
+      const remoteLastModified = remoteData._lastModified || 0
+
+      if (remoteLastModified > localLastModified) {
+        useAppStore.setState({
+          folders: remoteData.folders,
+          lessons: remoteData.lessons,
+          kanjiLessons: remoteData.kanjiLessons,
+          _lastModified: remoteData._lastModified,
+        })
+      }
+
+      setSyncStatus('synced')
+      setLastSyncedAt(Date.now())
+      setHasRemoteUpdate(false)
+    } catch (err) {
+      setSyncStatus('error')
+      setSyncError(err instanceof Error ? err.message : 'Lỗi đồng bộ')
+    } finally {
+      isPulling.current = false
+    }
+  }, [configured])
+
+  // ---- PUSH: đẩy data local lên Gist (admin only) ----
   const pushToGist = useCallback(async () => {
     if (isSyncing.current || !writable) return
     isSyncing.current = true
@@ -54,57 +104,44 @@ export function useGistSync() {
     }
   }, [writable])
 
-  // Pull từ public Gist on mount (1 lần duy nhất, KHÔNG cần token)
+  // ---- CHECK: kiểm tra xem remote có data mới không ----
+  const checkForUpdates = useCallback(async () => {
+    if (!configured || isPulling.current || isSyncing.current) return
+
+    try {
+      const { gistId } = getGistConfig()
+      const remoteData = await fetchGist(gistId)
+      if (!remoteData) return
+
+      const localLastModified = useAppStore.getState()._lastModified || 0
+      const remoteLastModified = remoteData._lastModified || 0
+
+      if (remoteLastModified > localLastModified) {
+        setHasRemoteUpdate(true)
+      }
+    } catch {
+      // Lỗi check im lặng, không làm gì
+    }
+  }, [configured])
+
+  // Auto pull on mount
   useEffect(() => {
     if (!configured) return
-
-    const pullFromGist = async () => {
-      if (isPulling.current) return
-      isPulling.current = true
-      setSyncStatus('syncing')
-      setSyncError(null)
-
-      try {
-        const { gistId } = getGistConfig()
-        const remoteData = await fetchGist(gistId)
-
-        if (!remoteData) {
-          isPulling.current = false
-          if (writable) await pushToGist()
-          else setSyncStatus('idle')
-          return
-        }
-
-        const localLastModified = useAppStore.getState()._lastModified || 0
-        const remoteLastModified = remoteData._lastModified || 0
-
-        if (remoteLastModified > localLastModified) {
-          useAppStore.setState({
-            folders: remoteData.folders,
-            lessons: remoteData.lessons,
-            kanjiLessons: remoteData.kanjiLessons,
-            _lastModified: remoteData._lastModified,
-          })
-        } else if (localLastModified > remoteLastModified && writable) {
-          isPulling.current = false
-          await pushToGist()
-          return
-        }
-
-        setSyncStatus('synced')
-        setLastSyncedAt(Date.now())
-      } catch (err) {
-        setSyncStatus('error')
-        setSyncError(err instanceof Error ? err.message : 'Lỗi đồng bộ')
-      } finally {
-        isPulling.current = false
-      }
-    }
-
     pullFromGist()
   }, [configured]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Theo dõi thay đổi store → đánh dấu dirty (không auto push)
+  // Kiểm tra data mới định kỳ (polling)
+  useEffect(() => {
+    if (!configured) return
+
+    const interval = setInterval(() => {
+      checkForUpdates()
+    }, CHECK_INTERVAL)
+
+    return () => clearInterval(interval)
+  }, [configured, checkForUpdates])
+
+  // Theo dõi thay đổi store → đánh dấu dirty (cho admin push)
   useEffect(() => {
     if (!configured) return
 
@@ -128,11 +165,15 @@ export function useGistSync() {
 
   return {
     pushToGist,
+    pullFromGist,
+    checkForUpdates,
     syncStatus,
     syncError,
     lastSyncedAt,
     configured,
+    writable,
     hasUnsyncedChanges,
     changeCount,
+    hasRemoteUpdate,
   }
 }

@@ -1,26 +1,28 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BookOpen, Home, ShieldCheck, ShieldOff, LogOut, X } from 'lucide-react'
+import { BookOpen, Home, ShieldCheck, ShieldOff, LogOut, X, Key, Check, Trash2 } from 'lucide-react'
 import { useAdminStore } from '../../store/useAdminStore'
 import SyncStatusIndicator from '../gist/SyncStatusIndicator'
 
 export default function Header() {
   const location = useLocation()
   const isHome = location.pathname === '/'
-  const { isAdmin, login, logout } = useAdminStore()
+  const { isAdmin, login, logout, gistToken, setGistToken, clearGistToken } = useAdminStore()
 
   const [showLogin, setShowLogin] = useState(false)
   const [code, setCode] = useState('')
   const [error, setError] = useState(false)
+  const [tokenInput, setTokenInput] = useState('')
+  const [tokenSaved, setTokenSaved] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Focus input when panel opens
   useEffect(() => {
-    if (showLogin) {
+    if (showLogin && !isAdmin) {
       setTimeout(() => inputRef.current?.focus(), 50)
     }
-  }, [showLogin])
+  }, [showLogin, isAdmin])
 
   // Close panel on outside click
   useEffect(() => {
@@ -30,6 +32,8 @@ export default function Header() {
         setShowLogin(false)
         setCode('')
         setError(false)
+        setTokenInput('')
+        setTokenSaved(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -40,7 +44,6 @@ export default function Header() {
     e.preventDefault()
     const success = login(code.trim())
     if (success) {
-      setShowLogin(false)
       setCode('')
       setError(false)
     } else {
@@ -48,6 +51,14 @@ export default function Header() {
       setCode('')
       inputRef.current?.focus()
     }
+  }
+
+  const handleSaveToken = () => {
+    if (!tokenInput.trim()) return
+    setGistToken(tokenInput.trim())
+    setTokenInput('')
+    setTokenSaved(true)
+    setTimeout(() => setTokenSaved(false), 2000)
   }
 
   const handleAdminClick = () => {
@@ -90,15 +101,15 @@ export default function Header() {
               {isAdmin ? <ShieldCheck size={20} /> : <ShieldOff size={20} />}
             </button>
 
-            {/* Login / Logout panel */}
+            {/* Login / Admin panel */}
             {showLogin && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 p-4 z-50">
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 p-4 z-50">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-semibold text-gray-700">
                     {isAdmin ? 'Quản trị viên' : 'Đăng nhập'}
                   </span>
                   <button
-                    onClick={() => { setShowLogin(false); setCode(''); setError(false) }}
+                    onClick={() => { setShowLogin(false); setCode(''); setError(false); setTokenInput(''); setTokenSaved(false) }}
                     className="text-gray-400 hover:text-gray-600"
                   >
                     <X size={16} />
@@ -107,9 +118,63 @@ export default function Header() {
 
                 {isAdmin ? (
                   <div>
-                    <p className="text-sm text-green-600 mb-3 flex items-center gap-1.5">
+                    <p className="text-sm text-green-600 mb-4 flex items-center gap-1.5">
                       <ShieldCheck size={16} /> Đang ở chế độ quản trị
                     </p>
+
+                    {/* Token section */}
+                    <div className="border-t border-gray-100 pt-3 mb-4">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                        GitHub Token (đồng bộ)
+                      </label>
+
+                      {gistToken ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 flex items-center gap-1.5 px-3 py-1.5 bg-green-50 rounded-lg">
+                            <Key size={14} className="text-green-600" />
+                            <span className="text-xs text-green-700 font-mono">
+                              {gistToken.slice(0, 8)}...{gistToken.slice(-4)}
+                            </span>
+                          </div>
+                          <button
+                            onClick={clearGistToken}
+                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Xóa token"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex gap-1.5">
+                            <div className="relative flex-1">
+                              <Key size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                              <input
+                                type="password"
+                                value={tokenInput}
+                                onChange={(e) => { setTokenInput(e.target.value); setTokenSaved(false) }}
+                                placeholder="ghp_xxxx..."
+                                className="w-full pl-8 pr-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:border-blue-500 outline-none transition-colors"
+                                onKeyDown={(e) => e.key === 'Enter' && handleSaveToken()}
+                              />
+                            </div>
+                            <button
+                              onClick={handleSaveToken}
+                              disabled={!tokenInput.trim()}
+                              className="px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                            >
+                              Lưu
+                            </button>
+                          </div>
+                          {tokenSaved && (
+                            <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                              <Check size={12} /> Đã lưu token
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     <button
                       onClick={() => { logout(); setShowLogin(false) }}
                       className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
