@@ -10,6 +10,7 @@ import {
   GraduationCap, ClipboardCheck, Home, FolderOpen, Search,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { KanjiText } from '../ui/KanjiTooltip'
 import type { KanjiEntry } from '../../types'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import LessonFormModal from '../lesson/LessonFormModal'
@@ -652,7 +653,7 @@ function KanjiDetailDialog({
                         key={i}
                         className="flex items-center gap-4 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors group"
                       >
-                        <span className="text-lg font-normal text-gray-900 min-w-[80px]">{vocab.word}</span>
+                        <span className="text-lg font-normal text-gray-900 min-w-[80px]"><KanjiText text={vocab.word} /></span>
                         {vocab.reading && (
                           <span className="text-sm text-blue-600 min-w-[80px]">{vocab.reading}</span>
                         )}

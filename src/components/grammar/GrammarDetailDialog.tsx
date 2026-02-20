@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { X, BookOpen, Layers, MessageCircle, Volume2, VolumeX, Eye, EyeOff, GraduationCap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { loadVoice, speak as ttsSpeak, stopSpeaking, isTTSSupported } from '../../lib/tts'
+import { KanjiText } from '../ui/KanjiTooltip'
 import type { GrammarPoint } from '../../types/grammar'
 import GrammarExercise from './exercises/GrammarExercise'
 
@@ -143,7 +144,7 @@ export default function GrammarDetailDialog({ grammar, allGrammar, onClose }: Gr
                     key={i}
                     className="px-3 py-2 bg-purple-50 rounded-lg text-sm font-mono text-purple-800 border border-purple-100"
                   >
-                    {s}
+                    <KanjiText text={s} />
                   </div>
                 ))}
               </div>
@@ -223,10 +224,10 @@ export default function GrammarDetailDialog({ grammar, allGrammar, onClose }: Gr
                         ) : (
                           <span className="flex-1 text-gray-900">{ex.reading ? (
                             <ruby className="leading-loose">
-                              {ex.ja}
+                              <KanjiText text={ex.ja} />
                               <rp>(</rp><rt className="text-[10px] text-gray-400 font-normal">{ex.reading}</rt><rp>)</rp>
                             </ruby>
-                          ) : ex.ja}</span>
+                          ) : <KanjiText text={ex.ja} />}</span>
                         )}
                         <button
                           onClick={(e) => { e.stopPropagation(); speak(ex.ja, i) }}
