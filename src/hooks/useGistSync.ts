@@ -1,8 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { v4 as uuidv4 } from 'uuid'
 import { useAppStore } from '../store/useAppStore'
 import { useAdminStore } from '../store/useAdminStore'
 import { isGistConfigured, getGistConfig, fetchGist, updateGist, resetETagCache } from '../lib/gistSync'
+import { n3KanjiEntries } from '../data/kanji/n3-kanji'
 import type { GistSyncData } from '../lib/gistSync'
+import type { KanjiEntry } from '../types'
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error'
 
@@ -54,6 +57,23 @@ export function useGistSync() {
         kanjiLessons: remoteData.kanjiLessons,
         _lastModified: remoteData._lastModified,
       })
+
+      // Seed N3 kanji nếu chưa có trong data remote
+      const hasN3 = remoteData.kanjiLessons.some(
+        (l) => l.name.includes('N3') && l.entries.length >= 100
+      )
+      if (!hasN3) {
+        const entries: KanjiEntry[] = n3KanjiEntries.map((e) => ({
+          ...e,
+          id: uuidv4(),
+        }))
+        useAppStore.getState().addKanjiLesson(
+          'Tổng hợp Hán tự N3',
+          null,
+          entries,
+          '200 Hán tự N3 cơ bản với từ vựng và cách đọc'
+        )
+      }
 
       setSyncStatus('synced')
       setLastSyncedAt(Date.now())

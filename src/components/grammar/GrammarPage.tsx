@@ -128,6 +128,7 @@ export default function GrammarPage() {
       {selectedGrammar && (
         <GrammarDetailDialog
           grammar={selectedGrammar}
+          allGrammar={n3Grammar}
           onClose={() => setSelectedGrammar(null)}
         />
       )}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 import { useAdminStore } from '../../store/useAdminStore'
@@ -14,7 +14,7 @@ import EmptyState from '../ui/EmptyState'
 import InlineFlashcardBrowser from '../ui/InlineFlashcardBrowser'
 import {
   ChevronLeft, Play, ClipboardCheck, Edit2, Trash2, Layers,
-  Type, FileText, FileUp, Globe, ArrowLeft, Home, FolderOpen,
+  Type, FileText, FileUp, Globe, ArrowLeft, Home, FolderOpen, Search, X,
 } from 'lucide-react'
 import type { Flashcard } from '../../types'
 
@@ -34,6 +34,18 @@ export default function LessonPage() {
   const [deleteCardId, setDeleteCardId] = useState<string | null>(null)
   const [lessonModal, setLessonModal] = useState(false)
   const [deleteLessonConfirm, setDeleteLessonConfirm] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const filteredCards = useMemo(() => {
+    if (!lesson || !search.trim()) return lesson?.cards ?? []
+    const q = search.trim().toLowerCase()
+    return lesson.cards.filter((c) =>
+      (c.kanji && c.kanji.toLowerCase().includes(q)) ||
+      (c.hiragana && c.hiragana.toLowerCase().includes(q)) ||
+      (c.meaning && c.meaning.toLowerCase().includes(q)) ||
+      (c.sinoVietnamese && c.sinoVietnamese.toLowerCase().includes(q))
+    )
+  }, [lesson, search])
 
   if (!lesson) {
     return (
@@ -88,7 +100,7 @@ export default function LessonPage() {
           {lesson.description && <p className="text-gray-500 mt-1">{lesson.description}</p>}
           <p className="text-sm text-gray-400 mt-1">{lesson.cards.length} thẻ</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
             <>
               <button
@@ -170,18 +182,48 @@ export default function LessonPage() {
         </>
       )}
 
+      {/* Search */}
+      {lesson.cards.length > 0 && (
+        <div className="relative mb-3">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm thẻ..."
+            className="w-full pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 bg-white placeholder-gray-400"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Card Table */}
       {lesson.cards.length > 0 ? (
         <div>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Danh sách thẻ ({lesson.cards.length})
+            Danh sách thẻ ({search.trim() ? `${filteredCards.length}/${lesson.cards.length}` : lesson.cards.length})
           </h2>
-          <CardTable
-            cards={lesson.cards}
-            onEdit={setEditCard}
-            onDelete={setDeleteCardId}
-            isAdmin={isAdmin}
-          />
+          {filteredCards.length > 0 ? (
+            <CardTable
+              cards={filteredCards}
+              onEdit={setEditCard}
+              onDelete={setDeleteCardId}
+              isAdmin={isAdmin}
+            />
+          ) : (
+            <div className="text-center py-12 text-gray-400">
+              <Search size={36} className="mx-auto mb-3 opacity-50" />
+              <p className="text-sm">Không tìm thấy "{search}"</p>
+              <button onClick={() => setSearch('')} className="text-xs text-blue-500 hover:underline mt-1">Xóa tìm kiếm</button>
+            </div>
+          )}
         </div>
       ) : (
         <EmptyState

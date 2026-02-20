@@ -7,7 +7,7 @@ import { kanjiEntriesToFlashcards } from '../../lib/kanjiToFlashcard'
 import InlineFlashcardBrowser from '../ui/InlineFlashcardBrowser'
 import {
   ChevronLeft, ArrowLeft, Trash2, Edit2, Volume2, X, BookOpen, PenTool, Play, RotateCcw,
-  GraduationCap, ClipboardCheck, Home, FolderOpen,
+  GraduationCap, ClipboardCheck, Home, FolderOpen, Search,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { KanjiEntry } from '../../types'
@@ -27,6 +27,7 @@ export default function KanjiLessonPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null)
   const [lessonModal, setLessonModal] = useState(false)
+  const [search, setSearch] = useState('')
   const { supported: ttsSupported, speak } = useTTS()
 
   // Convert kanji entries to vocab flashcards
@@ -34,6 +35,22 @@ export default function KanjiLessonPage() {
     if (!lesson) return []
     return kanjiEntriesToFlashcards(lesson.entries)
   }, [lesson])
+
+  const filteredEntries = useMemo(() => {
+    if (!lesson || !search.trim()) return lesson?.entries ?? []
+    const q = search.trim().toLowerCase()
+    return lesson.entries.filter((e) =>
+      e.character.includes(q) ||
+      e.sinoVietnamese.toLowerCase().includes(q) ||
+      (e.onyomi && e.onyomi.toLowerCase().includes(q)) ||
+      (e.kunyomi && e.kunyomi.toLowerCase().includes(q)) ||
+      e.vocabs.some((v) =>
+        v.word.toLowerCase().includes(q) ||
+        v.meaning.toLowerCase().includes(q) ||
+        (v.reading && v.reading.toLowerCase().includes(q))
+      )
+    )
+  }, [lesson, search])
 
   if (!lesson) {
     return (
@@ -86,7 +103,7 @@ export default function KanjiLessonPage() {
             {lesson.entries.length} Hán tự · {lesson.entries.reduce((sum, e) => sum + e.vocabs.length, 0)} từ vựng
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {lesson.entries.reduce((sum, e) => sum + e.vocabs.length, 0) > 0 && (
             <Link
               to={`/kanji/${lesson.id}/study`}
@@ -129,20 +146,57 @@ export default function KanjiLessonPage() {
         <InlineFlashcardBrowser cards={vocabCards} accent="orange" />
       )}
 
+      {/* Search */}
+      {lesson.entries.length > 0 && (
+        <div className="relative mb-3">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm Hán tự, từ vựng..."
+            className="w-full pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 bg-white placeholder-gray-400"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Kanji Grid */}
       {lesson.entries.length > 0 ? (
-        <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 mb-6">
-          {lesson.entries.map((entry) => (
-            <button
-              key={entry.id}
-              onClick={() => setSelectedEntry(entry)}
-              className="aspect-square rounded-xl border-2 border-gray-200 bg-white flex flex-col items-center justify-center transition-all hover:border-orange-300 hover:shadow-md"
-            >
-              <span className="text-2xl sm:text-3xl font-normal">{entry.character}</span>
-              <span className="text-[10px] text-orange-600 mt-0.5 font-medium">{entry.sinoVietnamese}</span>
-            </button>
-          ))}
-        </div>
+        filteredEntries.length > 0 ? (
+          <>
+            {search.trim() && (
+              <p className="text-xs text-gray-400 mb-2">
+                Tìm thấy {filteredEntries.length}/{lesson.entries.length} Hán tự
+              </p>
+            )}
+            <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 mb-6">
+              {filteredEntries.map((entry) => (
+                <button
+                  key={entry.id}
+                  onClick={() => setSelectedEntry(entry)}
+                  className="aspect-square rounded-xl border-2 border-gray-200 bg-white flex flex-col items-center justify-center transition-all hover:border-orange-300 hover:shadow-md"
+                >
+                  <span className="text-2xl sm:text-3xl font-normal">{entry.character}</span>
+                  <span className="text-[10px] text-orange-600 mt-0.5 font-medium">{entry.sinoVietnamese}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-12 text-gray-400">
+            <Search size={36} className="mx-auto mb-3 opacity-50" />
+            <p className="text-sm">Không tìm thấy "{search}"</p>
+            <button onClick={() => setSearch('')} className="text-xs text-orange-500 hover:underline mt-1">Xóa tìm kiếm</button>
+          </div>
+        )
       ) : (
         <div className="text-center py-12 text-gray-400">
           <BookOpen size={48} className="mx-auto mb-3 opacity-50" />
