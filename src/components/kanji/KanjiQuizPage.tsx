@@ -1,16 +1,32 @@
 import { useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
-import { kanjiEntriesToFlashcards } from '../../lib/kanjiToFlashcard'
+import { kanjiEntriesToFlashcards, kanjiEntriesToCharCards } from '../../lib/kanjiToFlashcard'
 import MultipleChoice from '../quiz/MultipleChoice'
 import WrittenAnswer from '../quiz/WrittenAnswer'
 import MatchPairs from '../quiz/MatchPairs'
 import { generateMultipleChoice, generateWrittenAnswer, generateMatchPairs } from '../../lib/quizGenerator'
-import { ChevronLeft, ListChecks, PenLine, Link2, Trophy, RotateCcw, Check, X } from 'lucide-react'
+import { ChevronLeft, ListChecks, PenLine, Link2, Trophy, RotateCcw, Check, X, BookOpen, Languages } from 'lucide-react'
 import type { QuizType, CardField, QuizQuestion } from '../../types'
 import { CARD_FIELD_LABELS } from '../../types'
 
 type QuizState = 'config' | 'playing' | 'results'
+type QuizMode = 'kanji-char' | 'vocab'
+
+interface QuizPreset {
+  id: string
+  label: string
+  desc: string
+  questionField: CardField
+  answerField: CardField
+}
+
+const KANJI_PRESETS: QuizPreset[] = [
+  { id: 'kanji-reading', label: 'Hán tự → Cách đọc', desc: 'Nhìn chữ Hán, chọn cách đọc Hiragana', questionField: 'kanji', answerField: 'hiragana' },
+  { id: 'kanji-meaning', label: 'Hán tự → Nghĩa Việt', desc: 'Nhìn chữ Hán, chọn âm Hán Việt', questionField: 'kanji', answerField: 'meaning' },
+  { id: 'meaning-kanji', label: 'Nghĩa Việt → Hán tự', desc: 'Nhìn âm Hán Việt, chọn chữ Hán', questionField: 'meaning', answerField: 'kanji' },
+  { id: 'reading-kanji', label: 'Cách đọc → Hán tự', desc: 'Nghe Hiragana, chọn chữ Hán', questionField: 'hiragana', answerField: 'kanji' },
+]
 
 const QUIZ_TYPES: { key: QuizType; label: string; icon: React.ReactNode; desc: string }[] = [
   { key: 'multipleChoice', label: 'Trắc nghiệm', icon: <ListChecks size={20} />, desc: 'Chọn đáp án đúng từ 4 lựa chọn' },
@@ -24,11 +40,20 @@ export default function KanjiQuizPage() {
   const { kanjiLessonId } = useParams<{ kanjiLessonId: string }>()
   const lesson = useAppStore((s) => s.kanjiLessons.find((l) => l.id === kanjiLessonId))
 
-  const cards = useMemo(() => {
+  // Vocab-level cards (mỗi từ vựng = 1 card)
+  const vocabCards = useMemo(() => {
     if (!lesson) return []
     return kanjiEntriesToFlashcards(lesson.entries)
   }, [lesson])
 
+  // Kanji-character-level cards (mỗi chữ Hán = 1 card)
+  const charCards = useMemo(() => {
+    if (!lesson) return []
+    return kanjiEntriesToCharCards(lesson.entries)
+  }, [lesson])
+
+  const [quizMode, setQuizMode] = useState<QuizMode>('kanji-char')
+  const [selectedPreset, setSelectedPreset] = useState<string>('kanji-reading')
   const [quizType, setQuizType] = useState<QuizType>('multipleChoice')
   const [questionField, setQuestionField] = useState<CardField>('kanji')
   const [answerField, setAnswerField] = useState<CardField>('hiragana')
@@ -46,13 +71,24 @@ export default function KanjiQuizPage() {
     )
   }
 
-  if (cards.length < 4) {
+  const activeCards = quizMode === 'kanji-char' ? charCards : vocabCards
+
+  if (activeCards.length < 4) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-500">Cần ít nhất 4 Hán tự để kiểm tra</p>
+        <p className="text-gray-500">Cần ít nhất 4 {quizMode === 'kanji-char' ? 'Hán tự' : 'từ vựng'} để kiểm tra</p>
         <Link to={`/kanji/${lesson.id}`} className="text-blue-600 hover:underline mt-2 inline-block">Về bài học</Link>
       </div>
     )
+  }
+
+  const handlePresetSelect = (presetId: string) => {
+    setSelectedPreset(presetId)
+    const preset = KANJI_PRESETS.find((p) => p.id === presetId)
+    if (preset) {
+      setQuestionField(preset.questionField)
+      setAnswerField(preset.answerField)
+    }
   }
 
   const startQuiz = () => {
@@ -179,7 +215,7 @@ export default function KanjiQuizPage() {
         {quizType === 'multipleChoice' && (
           <MultipleChoice
             key={quizKey}
-            questions={generateMultipleChoice(cards, questionField, answerField)}
+            questions={generateMultipleChoice(activeCards, questionField, answerField)}
             onComplete={(results) => { setQuizResults(results); setState('results') }}
           />
         )}
@@ -187,7 +223,7 @@ export default function KanjiQuizPage() {
         {quizType === 'writtenAnswer' && (
           <WrittenAnswer
             key={quizKey}
-            questions={generateWrittenAnswer(cards, questionField, answerField)}
+            questions={generateWrittenAnswer(activeCards, questionField, answerField)}
             onComplete={(results) => { setQuizResults(results); setState('results') }}
           />
         )}
@@ -195,9 +231,9 @@ export default function KanjiQuizPage() {
         {quizType === 'matchPairs' && (
           <MatchPairs
             key={quizKey}
-            pairs={generateMatchPairs(cards, questionField, answerField, 6)}
+            pairs={generateMatchPairs(activeCards, questionField, answerField, 6)}
             onComplete={(attempts, time) => {
-              const pairs = generateMatchPairs(cards, questionField, answerField, 6)
+              const pairs = generateMatchPairs(activeCards, questionField, answerField, 6)
               const results: QuizQuestion[] = pairs.map((p) => ({
                 cardId: p.id,
                 questionField,
@@ -231,6 +267,87 @@ export default function KanjiQuizPage() {
       <div className="max-w-lg mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Kiểm tra Hán tự</h1>
 
+        {/* Quiz mode tabs */}
+        <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
+          <button
+            onClick={() => setQuizMode('kanji-char')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              quizMode === 'kanji-char'
+                ? 'bg-white text-orange-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <BookOpen size={16} />
+            Chữ Hán ({charCards.length})
+          </button>
+          <button
+            onClick={() => setQuizMode('vocab')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              quizMode === 'vocab'
+                ? 'bg-white text-orange-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Languages size={16} />
+            Từ vựng ({vocabCards.length})
+          </button>
+        </div>
+
+        {/* Kanji presets (only for kanji-char mode) */}
+        {quizMode === 'kanji-char' && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Nội dung kiểm tra</label>
+            <div className="grid grid-cols-2 gap-2">
+              {KANJI_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => handlePresetSelect(preset.id)}
+                  className={`text-left px-3 py-2.5 rounded-lg border transition-all ${
+                    selectedPreset === preset.id
+                      ? 'border-orange-500 bg-orange-50 ring-1 ring-orange-200'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`text-sm font-medium ${selectedPreset === preset.id ? 'text-orange-700' : 'text-gray-700'}`}>
+                    {preset.label}
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">{preset.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Vocab mode: field selection */}
+        {quizMode === 'vocab' && (
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Câu hỏi</label>
+              <select
+                value={questionField}
+                onChange={(e) => setQuestionField(e.target.value as CardField)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white"
+              >
+                {FIELD_OPTIONS.map((f) => (
+                  <option key={f} value={f}>{CARD_FIELD_LABELS[f]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Đáp án</label>
+              <select
+                value={answerField}
+                onChange={(e) => setAnswerField(e.target.value as CardField)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white"
+              >
+                {FIELD_OPTIONS.filter((f) => f !== questionField).map((f) => (
+                  <option key={f} value={f}>{CARD_FIELD_LABELS[f]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* Quiz type */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">Loại kiểm tra</label>
@@ -255,39 +372,11 @@ export default function KanjiQuizPage() {
           </div>
         </div>
 
-        {/* Field selection */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Câu hỏi</label>
-            <select
-              value={questionField}
-              onChange={(e) => setQuestionField(e.target.value as CardField)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white"
-            >
-              {FIELD_OPTIONS.map((f) => (
-                <option key={f} value={f}>{CARD_FIELD_LABELS[f]}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Đáp án</label>
-            <select
-              value={answerField}
-              onChange={(e) => setAnswerField(e.target.value as CardField)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white"
-            >
-              {FIELD_OPTIONS.filter((f) => f !== questionField).map((f) => (
-                <option key={f} value={f}>{CARD_FIELD_LABELS[f]}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
         <button
           onClick={startQuiz}
           className="w-full px-4 py-3 text-base font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-colors"
         >
-          Bắt đầu kiểm tra
+          Bắt đầu kiểm tra ({activeCards.length} câu)
         </button>
       </div>
     </div>

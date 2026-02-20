@@ -36,3 +36,22 @@ export function kanjiEntriesToFlashcards(entries: KanjiEntry[]): Flashcard[] {
   }
   return cards
 }
+
+/**
+ * Convert KanjiEntry[] to Flashcard[] at kanji-character level.
+ * Each kanji entry becomes one flashcard:
+ *   entry.character → kanji (e.g. 食)
+ *   entry.onyomi (or kunyomi) → hiragana (e.g. しょく)
+ *   entry.sinoVietnamese → meaning (e.g. Thực)
+ *   entry.sinoVietnamese → sinoVietnamese (e.g. Thực)
+ */
+export function kanjiEntriesToCharCards(entries: KanjiEntry[]): Flashcard[] {
+  return entries.map((entry) => ({
+    id: `${entry.id}-char`,
+    kanji: entry.character,
+    hiragana: [entry.onyomi, entry.kunyomi].filter(Boolean).join('・'),
+    meaning: entry.sinoVietnamese,
+    sinoVietnamese: entry.sinoVietnamese,
+    createdAt: Date.now(),
+  }))
+}
